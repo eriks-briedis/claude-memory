@@ -1,6 +1,6 @@
 {
   "name": "@briedis/claude-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Per-project memory wiki for Claude Code, driven by hooks and a nightly compiler.",
   "type": "module",
   "bin": {

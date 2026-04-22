@@ -51,10 +51,11 @@ Set up the cron with `claude-memory doctor --suggest-cron`.
 ## Commands
 
 - `claude-memory init [--force]` — scaffold a new project
+- `claude-memory bootstrap [--dry-run] [--force] [--no-config]` — generate the initial wiki from the current codebase via `claude -p`
 - `claude-memory compile [--no-llm]` — run the compile pipeline
 - `claude-memory status` — summary of config, event count, last compile
 - `claude-memory doctor [--suggest-cron]` — validate configuration
-- `claude-memory hook {pre-task,post-write,session-end}` — internal, invoked by Claude Code
+- `claude-memory hook {session-start,pre-task,post-write,session-end}` — internal, invoked by Claude Code
 
 ## License
 

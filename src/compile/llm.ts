@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
@@ -6,6 +5,7 @@ import type { Config } from "../core/config.js";
 import type { MemoryPaths } from "../core/paths.js";
 import type { MemoryEvent } from "../core/events.js";
 import { summarizeEvent } from "./summarize.js";
+import { extractJson, invokeClaude } from "../util/claude.js";
 
 const PAGES = ["decisions.md", "gotchas.md"] as const;
 type PageName = (typeof PAGES)[number];
@@ -62,53 +62,7 @@ function writePage(moduleDir: string, page: PageName, content: string): void {
   writeFileSync(join(moduleDir, page), content.endsWith("\n") ? content : content + "\n");
 }
 
-async function invokeClaude(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("claude", ["-p", "--output-format=json"], {
-      stdio: ["pipe", "pipe", "pipe"]
-    });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (d) => (stdout += d.toString()));
-    proc.stderr.on("data", (d) => (stderr += d.toString()));
-    proc.on("error", (err) => reject(err));
-    proc.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(`claude exited ${code}: ${stderr.trim()}`));
-        return;
-      }
-      resolve(stdout);
-    });
-    proc.stdin.write(prompt);
-    proc.stdin.end();
-  });
-}
-
-function extractJson(output: string): ModelResponse {
-  try {
-    const parsed = JSON.parse(output);
-    const result =
-      typeof parsed === "object" && parsed !== null && "result" in parsed
-        ? (parsed as { result: unknown }).result
-        : parsed;
-    if (typeof result === "string") {
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]) as ModelResponse;
-    } else if (typeof result === "object" && result !== null) {
-      return result as ModelResponse;
-    }
-  } catch {
-    const m = output.match(/\{[\s\S]*\}/);
-    if (m) {
-      try {
-        return JSON.parse(m[0]) as ModelResponse;
-      } catch {
-        /* fall through */
-      }
-    }
-  }
-  return { no_update: true, notes: "unparseable model response" };
-}
+const UNPARSEABLE: ModelResponse = { no_update: true, notes: "unparseable model response" };
 
 export async function runLlmPass(
   paths: MemoryPaths,
@@ -137,7 +91,7 @@ export async function runLlmPass(
       continue;
     }
 
-    const response = extractJson(raw);
+    const response = extractJson<ModelResponse>(raw, UNPARSEABLE);
     if (response.no_update) {
       console.log(chalk.dim(`[llm] ${moduleId}: no update`));
       continue;

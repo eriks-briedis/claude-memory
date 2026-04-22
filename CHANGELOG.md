@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-04-22
+
+### Added
+- `claude-memory bootstrap [--dry-run] [--force] [--no-config]` generates the
+  initial wiki from the current project. Collects signals (package.json,
+  README, filtered directory tree, language tally, candidate modules under
+  src/ / services/ / apps/ / packages/), invokes `claude -p` with a
+  structured prompt, and writes overview, conventions, and per-module
+  index/architecture pages. Updates `config.yaml` modules block if none were
+  declared. Safe by default — only overwrites template pages; `decisions.md`,
+  `gotchas.md`, `pinned.md`, `active-work.md`, `open-questions.md` are never
+  touched.
+- `src/util/claude.ts` — shared `invokeClaude` + `extractJson` helpers
+  factored out of `compile/llm.ts`. Now reused by bootstrap.
+- Template files include a `<!-- claude-memory:template -->` sentinel so
+  bootstrap can distinguish default scaffolding from user-curated content.
+
+### Changed
+- `compile/llm.ts` now imports from `util/claude.ts` (pure refactor, no
+  behavior change).
+
 ## [0.3.0] - 2026-04-22
 
 ### Added
@@ -86,6 +107,7 @@ pick up the new hook entry, or add it manually to `.claude/settings.json`.
   open-question flagging), LLM pass via `claude -p`, wiki lint.
 - Starter wiki skeleton with a sample module seeded by `init`.
 
+[0.4.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.4.0
 [0.3.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.3.0
 [0.2.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.2.0
 [0.1.3]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.1.3
