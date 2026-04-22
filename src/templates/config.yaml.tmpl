@@ -1,0 +1,22 @@
+project:
+  id: {{project_id}}
+  memory_enabled: true
+
+retrieval:
+  always_read:
+    - wiki/index.md
+    - wiki/project/overview.md
+    - wiki/project/conventions.md
+    - wiki/current/pinned.md
+    - wiki/current/active-work.md
+  max_context_tokens: 8000
+
+modules:
+  example:
+    aliases:
+      - example module
+      - example
+    wiki_path: wiki/modules/example
+    owned_paths:
+      - src/example/**
+    related_cross_cutting: []
