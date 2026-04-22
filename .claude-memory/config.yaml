@@ -1,0 +1,66 @@
+project:
+  id: claude-memory
+  memory_enabled: true
+
+retrieval:
+  always_read:
+    - wiki/index.md
+    - wiki/project/overview.md
+    - wiki/project/conventions.md
+    - wiki/current/pinned.md
+    - wiki/current/active-work.md
+  max_context_tokens: 8000
+
+modules:
+  bootstrap:
+    aliases:
+      - bootstrap
+      - init-wiki
+      - seed
+    wiki_path: wiki/modules/bootstrap
+    owned_paths:
+      - src/bootstrap/**
+    related_cross_cutting: []
+  commands:
+    aliases:
+      - commands
+      - cli
+      - subcommands
+    wiki_path: wiki/modules/commands
+    owned_paths:
+      - src/commands/**
+    related_cross_cutting: []
+  compile:
+    aliases:
+      - compile
+      - compiler
+      - nightly
+    wiki_path: wiki/modules/compile
+    owned_paths:
+      - src/compile/**
+    related_cross_cutting: []
+  core:
+    aliases:
+      - core
+      - lib
+      - primitives
+    wiki_path: wiki/modules/core
+    owned_paths:
+      - src/core/**
+    related_cross_cutting: []
+  templates:
+    aliases:
+      - templates
+      - scaffold
+    wiki_path: wiki/modules/templates
+    owned_paths:
+      - src/templates/**
+    related_cross_cutting: []
+  util:
+    aliases:
+      - util
+      - helpers
+    wiki_path: wiki/modules/util
+    owned_paths:
+      - src/util/**
+    related_cross_cutting: []

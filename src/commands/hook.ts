@@ -147,7 +147,12 @@ export async function runPreTask(inputPayload?: HookPayload): Promise<void> {
 
   const prior = readSession(paths, sessionId);
   const editedFiles = prior?.edited_files ?? [];
-  const resolved = resolveModule(config, prompt, editedFiles);
+  const resolved = resolveModule(
+    config,
+    prompt,
+    editedFiles,
+    prior?.resolved_module
+  );
 
   upsertSession(paths, sessionId, {
     resolved_module: resolved?.id ?? null,
@@ -172,21 +177,35 @@ export async function runPreTask(inputPayload?: HookPayload): Promise<void> {
   const loaded = loadContext(paths, config, resolved);
   const context = formatContext(loaded);
 
-  const moduleLabel = resolved ? `${resolved.id} (${resolved.reason})` : "none";
+  const moduleLabel = resolved
+    ? `${resolved.id} (${resolved.reason}${resolved.matchedAlias ? `:${resolved.matchedAlias}` : ""})`
+    : "none";
   const skippedNote = loaded.skipped.length > 0 ? `, skipped ${loaded.skipped.length}` : "";
-  breadcrumb(
-    `pre-task: module=${moduleLabel}, loaded ${loaded.pages.length} page(s), ${loaded.totalTokens} token(s)${skippedNote}`
-  );
+  const summary = `pre-task: module=${moduleLabel}, loaded ${loaded.pages.length} page(s), ${loaded.totalTokens} token(s)${skippedNote}`;
+  breadcrumb(summary);
 
-  if (!context) return;
+  const output: {
+    systemMessage?: string;
+    hookSpecificOutput?: {
+      hookEventName: "UserPromptSubmit";
+      additionalContext: string;
+    };
+  } = {};
 
-  const output = {
-    hookSpecificOutput: {
+  if (config.retrieval.show_breadcrumb) {
+    output.systemMessage = `[claude-memory] ${summary}`;
+  }
+
+  if (context) {
+    output.hookSpecificOutput = {
       hookEventName: "UserPromptSubmit",
       additionalContext: context
-    }
-  };
-  process.stdout.write(JSON.stringify(output));
+    };
+  }
+
+  if (output.systemMessage || output.hookSpecificOutput) {
+    process.stdout.write(JSON.stringify(output));
+  }
 }
 
 export async function runPostWrite(inputPayload?: HookPayload): Promise<void> {

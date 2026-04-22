@@ -83,4 +83,32 @@ describe("loadContext", () => {
     const formatted = formatContext(res);
     expect(formatted).toContain("--- FILE: wiki/index.md ---");
   });
+
+  it("auto-includes wiki/current/pinned.md when present", () => {
+    mkdirSync(join(paths.wikiDir, "current"), { recursive: true });
+    writeFileSync(
+      join(paths.wikiDir, "current", "pinned.md"),
+      "# Pinned\nInvariant: X.\n"
+    );
+    const res = loadContext(paths, config, null);
+    expect(res.pages.map((p) => p.path)).toContain("wiki/current/pinned.md");
+  });
+
+  it("does not duplicate pinned.md when also listed in always_read", () => {
+    mkdirSync(join(paths.wikiDir, "current"), { recursive: true });
+    writeFileSync(
+      join(paths.wikiDir, "current", "pinned.md"),
+      "# Pinned\n"
+    );
+    const cfg: Config = {
+      ...config,
+      retrieval: {
+        always_read: ["wiki/current/pinned.md"],
+        max_context_tokens: 8000
+      }
+    };
+    const res = loadContext(paths, cfg, null);
+    const hits = res.pages.filter((p) => p.path === "wiki/current/pinned.md");
+    expect(hits).toHaveLength(1);
+  });
 });

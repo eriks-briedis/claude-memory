@@ -4,6 +4,79 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-04-23
+
+### Added
+- **`retrieval.show_breadcrumb` config flag** (default `false`). When enabled,
+  the `pre-task` hook emits a `systemMessage` alongside `additionalContext`,
+  surfacing the retrieval summary in the regular TUI transcript instead of
+  only on debug stderr — e.g. `[claude-memory] pre-task: module=bootstrap
+  (alias-exact:bootstrap), loaded 4 page(s), 1243 token(s)`. New installs
+  see the option in the scaffolded `config.yaml`; existing installs need to
+  add `show_breadcrumb: true` under `retrieval:` manually.
+
+## [0.5.0] - 2026-04-23
+
+### Changed
+- **Alias matching now requires word boundaries.** The exact-alias pass in
+  `core/resolver.ts` uses `\b<alias>\b` instead of raw `String.includes`, so
+  alias `"api"` no longer matches the word "capitalize" and alias `"auth"`
+  no longer matches "authoritative". Expect fewer false-positive retrievals
+  — and a few prompts that previously matched loosely may now fall through
+  to fuzzy or stickiness.
+- **Fuzzy fallback actually works now.** Previously `Searcher.search(prompt)`
+  compared the full prompt string to short aliases at threshold 0.85 — a
+  pairing that almost never cleared the bar. The resolver now tokenizes the
+  prompt (`[^A-Za-z0-9_-]+` split, minimum 4-char tokens) and searches each
+  token against aliases, keeping the best score. The second-chance resolver
+  is no longer effectively dead.
+
+### Added
+- **Session-sticky fallback.** `resolveModule` now accepts an optional
+  `priorModuleId` and returns the prior turn's module (reason:
+  `session-sticky`) when prompt resolution and recent-edits both fail. Short
+  follow-up prompts like "keep going" or "fix that" carry the active module
+  forward instead of falling off into no-module retrieval.
+- `wiki/current/pinned.md` is now auto-included in every `pre-task` context
+  load. Previously the template advertised it as "always in context" but
+  nothing read it unless users added it to `retrieval.always_read` manually.
+- `ResolvedModule.matchedAlias` exposes which alias fired, and the pre-task
+  breadcrumb surfaces it: `module=foo (alias-exact:login)`.
+
+## [0.4.1] - 2026-04-23
+
+### Added
+- `bootstrap` now streams events from `claude -p` via
+  `--output-format=stream-json --verbose`. Prints `model`, `session_id`, and
+  permission mode within ~100ms of connecting; emits per-turn lines for each
+  tool call the model makes; a 10s ticker surfaces live
+  `elapsed/turns/output-tokens/tool-count` counters; warns on
+  `rate_limit_event` when status is not `allowed`; final summary reports
+  turns, output tokens, tool calls, claude-reported duration, cache read
+  tokens, and `total_cost_usd`.
+- `bootstrap --verbose` / `-v`: dumps the full prompt, the full raw response,
+  every stream event type, and the `claude` stderr stream.
+- `bootstrap` writes the raw claude response to
+  `.claude-memory/state/bootstrap-last-response.txt` on every run — useful
+  for diffing between attempts and for inspection on parse failure.
+- New `parseJsonResponse<T>` diagnostic helper in `util/claude.ts` reports
+  the parse stage (`wrapper-object` / `wrapper-result-object` /
+  `wrapper-result-embedded` / `raw-embedded` / `none`) and extracts wrapper
+  metadata (session id, usage, cost, `is_error`).
+- `invokeClaude` gained `stream`, `includePartialMessages`, `onEvent`, and
+  `onStderr` options, and now returns `{stdout, stderr, exitCode,
+  durationMs, finalEvent}` instead of a bare string.
+
+### Changed
+- `bootstrap` now prints each planned module (id, source, owned paths), the
+  prompt size in chars + tokens, and warns when the model omits planned
+  modules or returns unplanned ones.
+- On claude failure, `bootstrap` prints the exit code, full stderr, and a
+  reproducer hint instead of only the error message.
+- On parse failure, `bootstrap` prints the specific parse error, the first
+  500 chars of the response, flags `is_error=true` when claude reported it,
+  and points at the saved debug file.
+
 ## [0.4.0] - 2026-04-22
 
 ### Added
@@ -107,6 +180,8 @@ pick up the new hook entry, or add it manually to `.claude/settings.json`.
   open-question flagging), LLM pass via `claude -p`, wiki lint.
 - Starter wiki skeleton with a sample module seeded by `init`.
 
+[0.5.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.5.0
+[0.4.1]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.4.1
 [0.4.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.4.0
 [0.3.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.3.0
 [0.2.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.2.0

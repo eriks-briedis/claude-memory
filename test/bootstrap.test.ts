@@ -18,11 +18,29 @@ vi.mock("../src/util/claude.js", async () => {
       } catch {
         return fallback;
       }
+    },
+    parseJsonResponse: (raw: string) => {
+      try {
+        return { value: JSON.parse(raw), stage: "wrapper-object" };
+      } catch (err) {
+        return {
+          value: null,
+          stage: "none",
+          error: err instanceof Error ? err.message : String(err)
+        };
+      }
     }
   };
 });
 
 import { invokeClaude } from "../src/util/claude.js";
+type InvokeResult = { stdout: string; stderr: string; exitCode: number; durationMs: number };
+const mockInvoke = (raw: string): InvokeResult => ({
+  stdout: raw,
+  stderr: "",
+  exitCode: 0,
+  durationMs: 0
+});
 import { runBootstrap } from "../src/commands/bootstrap.js";
 import { loadConfig } from "../src/core/config.js";
 
@@ -73,7 +91,7 @@ describe("runBootstrap", () => {
   });
 
   it("writes all target files and updates config.yaml for inferred modules", async () => {
-    vi.mocked(invokeClaude).mockResolvedValueOnce(JSON.stringify(fakeResponse));
+    vi.mocked(invokeClaude).mockResolvedValueOnce(mockInvoke(JSON.stringify(fakeResponse)));
     const root = await initRepo();
     const prev = process.cwd();
     process.chdir(root);
@@ -99,7 +117,7 @@ describe("runBootstrap", () => {
   });
 
   it("dry-run writes nothing", async () => {
-    vi.mocked(invokeClaude).mockResolvedValueOnce(JSON.stringify(fakeResponse));
+    vi.mocked(invokeClaude).mockResolvedValueOnce(mockInvoke(JSON.stringify(fakeResponse)));
     const root = await initRepo();
     const before = readFileSync(
       join(root, ".claude-memory", "wiki", "project", "overview.md"),
@@ -120,7 +138,7 @@ describe("runBootstrap", () => {
   });
 
   it("--no-config leaves config.yaml untouched", async () => {
-    vi.mocked(invokeClaude).mockResolvedValueOnce(JSON.stringify(fakeResponse));
+    vi.mocked(invokeClaude).mockResolvedValueOnce(mockInvoke(JSON.stringify(fakeResponse)));
     const root = await initRepo();
     const configBefore = readFileSync(
       join(root, ".claude-memory", "config.yaml"),

@@ -5,18 +5,36 @@ import type { Config, ModuleConfig } from "./config.js";
 export interface ResolvedModule {
   id: string;
   module: ModuleConfig;
-  reason: "alias-exact" | "alias-fuzzy" | "recent-edits";
+  reason: "alias-exact" | "alias-fuzzy" | "recent-edits" | "session-sticky";
   score?: number;
+  matchedAlias?: string;
 }
 
 const FUZZY_THRESHOLD = 0.85;
+const MIN_FUZZY_TOKEN_LEN = 4;
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function aliasMatchesPrompt(alias: string, prompt: string): boolean {
+  if (!alias) return false;
+  const re = new RegExp(`\\b${escapeRegex(alias)}\\b`, "i");
+  return re.test(prompt);
+}
+
+function tokenize(prompt: string): string[] {
+  return prompt
+    .split(/[^A-Za-z0-9_-]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= MIN_FUZZY_TOKEN_LEN);
+}
 
 export function resolveFromPrompt(config: Config, prompt: string): ResolvedModule | null {
-  const lower = prompt.toLowerCase();
   for (const [id, mod] of Object.entries(config.modules)) {
     for (const alias of mod.aliases) {
-      if (alias && lower.includes(alias.toLowerCase())) {
-        return { id, module: mod, reason: "alias-exact" };
+      if (aliasMatchesPrompt(alias, prompt)) {
+        return { id, module: mod, reason: "alias-exact", matchedAlias: alias };
       }
     }
   }
@@ -34,14 +52,23 @@ export function resolveFromPrompt(config: Config, prompt: string): ResolvedModul
     threshold: FUZZY_THRESHOLD,
     returnMatchData: true
   });
-  const hits = searcher.search(prompt);
-  if (hits.length === 0) return null;
-  const best = hits[0];
+
+  const tokens = tokenize(prompt);
+  let best: { item: { id: string; module: ModuleConfig; alias: string }; score: number } | null =
+    null;
+  for (const token of tokens) {
+    const hits = searcher.search(token);
+    for (const h of hits) {
+      if (!best || h.score > best.score) best = h;
+    }
+  }
+  if (!best) return null;
   return {
     id: best.item.id,
     module: best.item.module,
     reason: "alias-fuzzy",
-    score: best.score
+    score: best.score,
+    matchedAlias: best.item.alias
   };
 }
 
@@ -62,10 +89,25 @@ export function resolveFromEditedFiles(
   return { id: matches[0].id, module: matches[0].module, reason: "recent-edits" };
 }
 
+function resolveFromPriorSession(
+  config: Config,
+  priorModuleId: string | null | undefined
+): ResolvedModule | null {
+  if (!priorModuleId) return null;
+  const mod = config.modules[priorModuleId];
+  if (!mod) return null;
+  return { id: priorModuleId, module: mod, reason: "session-sticky" };
+}
+
 export function resolveModule(
   config: Config,
   prompt: string,
-  editedFiles: string[]
+  editedFiles: string[],
+  priorModuleId?: string | null
 ): ResolvedModule | null {
-  return resolveFromPrompt(config, prompt) ?? resolveFromEditedFiles(config, editedFiles);
+  return (
+    resolveFromPrompt(config, prompt) ??
+    resolveFromEditedFiles(config, editedFiles) ??
+    resolveFromPriorSession(config, priorModuleId)
+  );
 }

@@ -54,7 +54,7 @@ export function loadContext(
   const seen = new Set<string>();
   let total = 0;
 
-  const queue: string[] = [...config.retrieval.always_read];
+  const queue: string[] = ["wiki/current/pinned.md", ...config.retrieval.always_read];
 
   if (resolved) {
     const indexRel = `${resolved.module.wiki_path}/index.md`;

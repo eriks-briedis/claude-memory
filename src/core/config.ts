@@ -17,9 +17,10 @@ const ConfigSchema = z.object({
   retrieval: z
     .object({
       always_read: z.array(z.string()).default([]),
-      max_context_tokens: z.number().int().positive().default(8000)
+      max_context_tokens: z.number().int().positive().default(8000),
+      show_breadcrumb: z.boolean().default(false)
     })
-    .default({ always_read: [], max_context_tokens: 8000 }),
+    .default({ always_read: [], max_context_tokens: 8000, show_breadcrumb: false }),
   modules: z.record(z.string(), ModuleSchema).default({})
 });
 

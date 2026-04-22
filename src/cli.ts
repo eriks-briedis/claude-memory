@@ -6,7 +6,7 @@ const program = new Command();
 program
   .name("claude-memory")
   .description("Per-project memory wiki for Claude Code.")
-  .version("0.4.0");
+  .version("0.5.0");
 
 program
   .command("init")
@@ -55,6 +55,7 @@ program
   .option("--dry-run", "Print planned writes without touching files.")
   .option("--force", "Overwrite even user-edited pages.")
   .option("--no-config", "Do not update config.yaml modules block.")
+  .option("-v, --verbose", "Print full prompt, raw claude response, and stderr stream.")
   .action(async (opts) => {
     const { runBootstrap } = await import("./commands/bootstrap.js");
     await runBootstrap(opts);

@@ -53,4 +53,48 @@ describe("resolveModule", () => {
     const r = resolveModule(config, "unrelated prompt", ["README.md"]);
     expect(r).toBeNull();
   });
+
+  it("does not match alias as a partial word (word-boundary required)", () => {
+    const cfg: Config = {
+      ...config,
+      modules: {
+        api: {
+          aliases: ["api"],
+          wiki_path: "wiki/modules/api",
+          owned_paths: [],
+          related_cross_cutting: []
+        }
+      }
+    };
+    const r = resolveModule(cfg, "please capitalize the README", []);
+    expect(r).toBeNull();
+  });
+
+  it("tokenized fuzzy search matches when a single prompt word is close to an alias", () => {
+    const r = resolveModule(config, "work on dispute today please", []);
+    expect(r?.id).toBe("disputes");
+    expect(r?.reason).toBe("alias-fuzzy");
+  });
+
+  it("session-sticky fallback uses prior resolved module when prompt and edits are empty", () => {
+    const r = resolveModule(config, "keep going", [], "disputes");
+    expect(r?.id).toBe("disputes");
+    expect(r?.reason).toBe("session-sticky");
+  });
+
+  it("session-sticky is ignored when the prior module no longer exists in config", () => {
+    const r = resolveModule(config, "keep going", [], "removed-module");
+    expect(r).toBeNull();
+  });
+
+  it("prompt resolution wins over session stickiness", () => {
+    const r = resolveModule(config, "fix the clearance bug", [], "disputes");
+    expect(r?.id).toBe("account-clearance");
+    expect(r?.reason).toBe("alias-exact");
+  });
+
+  it("exposes the matched alias for alias-exact resolutions", () => {
+    const r = resolveModule(config, "fix the clearance bug", []);
+    expect(r?.matchedAlias).toBe("clearance");
+  });
 });

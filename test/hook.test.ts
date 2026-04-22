@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runInit } from "../src/commands/init.js";
@@ -115,6 +115,63 @@ describe("hook events", () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0].prompt).toContain("example module");
     expect(prompts[0].module).toBe("example");
+  });
+
+  it("pre-task surfaces systemMessage in TUI when show_breadcrumb is enabled", async () => {
+    const root = await initRepo();
+    const configPath = join(root, ".claude-memory", "config.yaml");
+    const yaml = readFileSync(configPath, "utf8").replace(
+      "show_breadcrumb: false",
+      "show_breadcrumb: true"
+    );
+    writeFileSync(configPath, yaml);
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    let captured = "";
+    (process.stdout as { write: typeof process.stdout.write }).write = ((
+      chunk: string | Uint8Array
+    ) => {
+      captured += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      await inCwd(root, () =>
+        runPreTask({ session_id: "sb1", prompt: "work on the example module" })
+      );
+    } finally {
+      (process.stdout as { write: typeof process.stdout.write }).write = origWrite;
+    }
+
+    const parsed = JSON.parse(captured);
+    expect(parsed.systemMessage).toMatch(/^\[claude-memory\] pre-task:/);
+    expect(parsed.systemMessage).toContain("module=example");
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+  });
+
+  it("pre-task omits systemMessage when show_breadcrumb is disabled", async () => {
+    const root = await initRepo();
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    let captured = "";
+    (process.stdout as { write: typeof process.stdout.write }).write = ((
+      chunk: string | Uint8Array
+    ) => {
+      captured += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      await inCwd(root, () =>
+        runPreTask({ session_id: "sb2", prompt: "work on the example module" })
+      );
+    } finally {
+      (process.stdout as { write: typeof process.stdout.write }).write = origWrite;
+    }
+
+    const parsed = JSON.parse(captured);
+    expect(parsed.systemMessage).toBeUndefined();
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
   });
 
   it("session-end writes a session_close event", async () => {

@@ -81,7 +81,8 @@ export async function runLlmPass(
 
     let raw: string;
     try {
-      raw = await invokeClaude(prompt);
+      const result = await invokeClaude(prompt);
+      raw = result.stdout;
     } catch (err) {
       console.error(
         chalk.yellow(
