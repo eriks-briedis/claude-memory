@@ -1,6 +1,6 @@
 {
   "name": "@briedis/claude-memory",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "description": "Per-project memory wiki for Claude Code, driven by hooks and a nightly compiler.",
   "type": "module",
   "bin": {
@@ -8,7 +8,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"

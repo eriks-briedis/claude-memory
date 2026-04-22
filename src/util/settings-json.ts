@@ -21,6 +21,9 @@ export interface ClaudeSettings {
 }
 
 export const CLAUDE_MEMORY_HOOKS: HooksBlock = {
+  SessionStart: [
+    { hooks: [{ type: "command", command: "claude-memory hook session-start" }] }
+  ],
   UserPromptSubmit: [
     { hooks: [{ type: "command", command: "claude-memory hook pre-task" }] }
   ],

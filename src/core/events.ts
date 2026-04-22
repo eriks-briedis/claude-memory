@@ -11,17 +11,43 @@ import { join } from "node:path";
 import lockfile from "proper-lockfile";
 import type { MemoryPaths } from "./paths.js";
 
-export type EventType = "file_write" | "session_close" | "user_instruction";
+export type EventType =
+  | "file_write"
+  | "session_close"
+  | "user_instruction"
+  | "user_prompt";
 export type Importance = "normal" | "high";
+
+export interface FileChange {
+  file: string;
+  tool: string;
+  kind: "write" | "edit";
+  content?: string;
+  content_truncated?: boolean;
+  old_string?: string;
+  new_string?: string;
+  old_truncated?: boolean;
+  new_truncated?: boolean;
+}
 
 export interface MemoryEvent {
   type: EventType;
   session_id: string;
   module: string | null;
   files: string[];
+  changes?: FileChange[];
+  prompt?: string;
   ts: string;
   summary: string | null;
   importance: Importance;
+}
+
+const PREVIEW_LIMIT = 500;
+
+export function truncate(value: string | undefined): { text?: string; truncated: boolean } {
+  if (typeof value !== "string") return { truncated: false };
+  if (value.length <= PREVIEW_LIMIT) return { text: value, truncated: false };
+  return { text: value.slice(0, PREVIEW_LIMIT) + "…", truncated: true };
 }
 
 function today(): string {

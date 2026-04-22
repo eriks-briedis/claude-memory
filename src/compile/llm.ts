@@ -5,6 +5,7 @@ import chalk from "chalk";
 import type { Config } from "../core/config.js";
 import type { MemoryPaths } from "../core/paths.js";
 import type { MemoryEvent } from "../core/events.js";
+import { summarizeEvent } from "./summarize.js";
 
 const PAGES = ["decisions.md", "gotchas.md"] as const;
 type PageName = (typeof PAGES)[number];
@@ -20,10 +21,8 @@ function buildPrompt(
   currentPages: Record<PageName, string>,
   events: MemoryEvent[]
 ): string {
-  const eventDump = events
-    .filter((e) => e.module === moduleId)
-    .map((e) => JSON.stringify(e))
-    .join("\n");
+  const relevant = events.filter((e) => e.module === moduleId);
+  const summaries = relevant.map(summarizeEvent).join("\n");
 
   return [
     `You are updating the wiki for module "${moduleId}".`,
@@ -34,10 +33,10 @@ function buildPrompt(
       currentPages[p].trimEnd(),
       ""
     ]),
-    "New raw events since the last compile:",
-    eventDump || "(none)",
+    "Activity since the last compile (one line per event; `+NL` = lines added, `AL → BL` = edit size):",
+    summaries || "(none)",
     "",
-    "Update decisions.md and gotchas.md ONLY if the new events contain material worth promoting to canonical wiki content (decisions made, traps discovered). Do not paraphrase existing content.",
+    "Update decisions.md and gotchas.md ONLY if the activity above reveals material worth promoting to canonical wiki content (decisions made, traps discovered, API contracts established). Do not paraphrase existing content.",
     "",
     "Respond with a single JSON object and nothing else:",
     "{",

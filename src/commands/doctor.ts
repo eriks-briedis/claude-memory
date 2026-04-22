@@ -74,6 +74,7 @@ export async function runDoctor(opts: { suggestCron?: boolean }): Promise<void> 
       const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
       const commands = JSON.stringify(settings.hooks ?? {});
       const present =
+        commands.includes("claude-memory hook session-start") &&
         commands.includes("claude-memory hook pre-task") &&
         commands.includes("claude-memory hook post-write") &&
         commands.includes("claude-memory hook session-end");

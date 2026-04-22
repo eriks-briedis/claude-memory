@@ -6,7 +6,7 @@ const program = new Command();
 program
   .name("claude-memory")
   .description("Per-project memory wiki for Claude Code.")
-  .version("0.1.0");
+  .version("0.3.0");
 
 program
   .command("init")
@@ -20,6 +20,13 @@ program
 const hook = program
   .command("hook")
   .description("Internal hook dispatcher (invoked by Claude Code, not users).");
+
+hook
+  .command("session-start")
+  .action(async () => {
+    const { runSessionStart } = await import("./commands/hook.js");
+    await runSessionStart();
+  });
 
 hook
   .command("pre-task")
