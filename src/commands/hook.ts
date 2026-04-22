@@ -38,6 +38,10 @@ function parsePayload(raw: string): HookPayload {
   }
 }
 
+function breadcrumb(msg: string): void {
+  process.stderr.write(`[claude-memory] ${msg}\n`);
+}
+
 function extractWrittenFiles(payload: HookPayload): string[] {
   const input = payload.tool_input;
   if (!input) return [];
@@ -78,6 +82,13 @@ export async function runPreTask(): Promise<void> {
 
   const loaded = loadContext(paths, config, resolved);
   const context = formatContext(loaded);
+
+  const moduleLabel = resolved ? `${resolved.id} (${resolved.reason})` : "none";
+  const skippedNote = loaded.skipped.length > 0 ? `, skipped ${loaded.skipped.length}` : "";
+  breadcrumb(
+    `pre-task: module=${moduleLabel}, loaded ${loaded.pages.length} page(s), ${loaded.totalTokens} token(s)${skippedNote}`
+  );
+
   if (!context) return;
 
   const output = {
@@ -119,6 +130,9 @@ export async function runPostWrite(): Promise<void> {
     importance: "normal"
   };
   await appendEvent(paths, event);
+  breadcrumb(
+    `post-write: module=${event.module ?? "none"}, ${files.length} file(s): ${files.join(", ")}`
+  );
 }
 
 export async function runSessionEnd(): Promise<void> {
@@ -149,4 +163,7 @@ export async function runSessionEnd(): Promise<void> {
     importance: "normal"
   };
   await appendEvent(paths, event);
+  breadcrumb(
+    `session-end: module=${event.module ?? "none"}, ${event.files.length} file(s) touched`
+  );
 }
