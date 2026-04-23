@@ -51,6 +51,14 @@ export function summarizeEvent(e: MemoryEvent): string {
     case "session_close": {
       return `[${ts}] ${mod} session_close: ${e.files.length} file(s) touched`;
     }
+    case "session_summary": {
+      const preview = firstLine(e.summary ?? "", 240);
+      return `[${ts}] ${mod} session_summary (${e.importance}): ${preview}`;
+    }
+    case "learned_fact": {
+      const preview = firstLine(e.summary ?? e.prompt ?? "", 240);
+      return `[${ts}] ${mod} learned_fact (${e.importance}): ${preview}`;
+    }
     default:
       return `[${ts}] ${mod} ${e.type}`;
   }

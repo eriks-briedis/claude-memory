@@ -12,6 +12,7 @@ import {
 import { appendEvent, type MemoryEvent } from "../src/core/events.js";
 import { listEventFiles, readEventFile } from "../src/core/events.js";
 import { buildPaths } from "../src/core/paths.js";
+import { readSession } from "../src/core/session-state.js";
 
 async function initRepo(): Promise<string> {
   const root = mkdtempSync(join(tmpdir(), "cm-hook-"));
@@ -186,6 +187,33 @@ describe("hook events", () => {
     expect(closes).toHaveLength(1);
   });
 
+  it("session-end records transcript_path when provided by the Stop payload", async () => {
+    const root = await initRepo();
+    await inCwd(root, () =>
+      runPreTask({ session_id: "s4", prompt: "work on example" })
+    );
+    await inCwd(root, () =>
+      runSessionEnd({ session_id: "s4", transcript_path: "/tmp/some/transcript.jsonl" })
+    );
+    const closes = listEventFiles(buildPaths(root))
+      .map(readEventFile)
+      .filter((e) => e.type === "session_close");
+    expect(closes).toHaveLength(1);
+    expect(closes[0].transcript_path).toBe("/tmp/some/transcript.jsonl");
+  });
+
+  it("session-end omits transcript_path when the Stop payload has none", async () => {
+    const root = await initRepo();
+    await inCwd(root, () =>
+      runPreTask({ session_id: "s5", prompt: "work on example" })
+    );
+    await inCwd(root, () => runSessionEnd({ session_id: "s5" }));
+    const closes = listEventFiles(buildPaths(root))
+      .map(readEventFile)
+      .filter((e) => e.type === "session_close");
+    expect(closes[0].transcript_path).toBeUndefined();
+  });
+
   it("session-start surfaces high-importance events on stderr and as additionalContext", async () => {
     const root = await initRepo();
     const paths = buildPaths(root);
@@ -226,6 +254,53 @@ describe("hook events", () => {
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       "ledger must reconcile"
     );
+  });
+
+  it("post-write tags event via file-path resolution even when prompt did not resolve", async () => {
+    const root = await initRepo();
+    await inCwd(root, () =>
+      runPreTask({ session_id: "spw1", prompt: "fix this bug" })
+    );
+    const sessionBefore = readSession(buildPaths(root), "spw1");
+    expect(sessionBefore?.resolved_module).toBeNull();
+
+    await inCwd(root, () =>
+      runPostWrite({
+        session_id: "spw1",
+        tool_name: "Edit",
+        tool_input: {
+          file_path: "src/example/foo.ts",
+          old_string: "a",
+          new_string: "b"
+        }
+      })
+    );
+
+    const writes = listEventFiles(buildPaths(root))
+      .map(readEventFile)
+      .filter((e) => e.type === "file_write");
+    expect(writes[0].module).toBe("example");
+
+    const sessionAfter = readSession(buildPaths(root), "spw1");
+    expect(sessionAfter?.resolved_module).toBe("example");
+  });
+
+  it("post-write falls back to session.resolved_module when file path matches no module", async () => {
+    const root = await initRepo();
+    await inCwd(root, () =>
+      runPreTask({ session_id: "spw2", prompt: "work on the example module" })
+    );
+    await inCwd(root, () =>
+      runPostWrite({
+        session_id: "spw2",
+        tool_name: "Write",
+        tool_input: { file_path: "README.md", content: "x" }
+      })
+    );
+    const writes = listEventFiles(buildPaths(root))
+      .map(readEventFile)
+      .filter((e) => e.type === "file_write");
+    expect(writes[0].module).toBe("example");
   });
 
   it("truncates long content with a marker", async () => {

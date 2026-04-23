@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { loadConfig } from "../core/config.js";
 import { resolvePaths } from "../core/paths.js";
-import { resolveModule } from "../core/resolver.js";
+import { resolveFromEditedFiles, resolveModule } from "../core/resolver.js";
 import { loadContext, formatContext } from "../core/context-loader.js";
 import {
   addEditedFile,
@@ -29,6 +29,7 @@ interface HookPayload {
   cwd?: string;
   prompt?: string;
   source?: string;
+  transcript_path?: string;
   tool_name?: string;
   tool_input?: {
     file_path?: string;
@@ -229,10 +230,17 @@ export async function runPostWrite(inputPayload?: HookPayload): Promise<void> {
   for (const f of files) addEditedFile(paths, sessionId, f);
   const session = readSession(paths, sessionId);
 
+  const pathHit = resolveFromEditedFiles(config, files);
+  const resolvedModule = pathHit?.id ?? session?.resolved_module ?? null;
+
+  if (pathHit && session && session.resolved_module !== pathHit.id) {
+    upsertSession(paths, sessionId, { resolved_module: pathHit.id });
+  }
+
   const event: MemoryEvent = {
     type: "file_write",
     session_id: sessionId,
-    module: session?.resolved_module ?? null,
+    module: resolvedModule,
     files,
     changes,
     ts: nowIso(),
@@ -241,7 +249,7 @@ export async function runPostWrite(inputPayload?: HookPayload): Promise<void> {
   };
   await appendEvent(paths, event);
   breadcrumb(
-    `post-write: module=${event.module ?? "none"}, tool=${payload.tool_name ?? "?"}, ${files.length} file(s): ${files.join(", ")}`
+    `post-write: module=${event.module ?? "none"}${pathHit ? ` (path-matched)` : ""}, tool=${payload.tool_name ?? "?"}, ${files.length} file(s): ${files.join(", ")}`
   );
 }
 
@@ -270,11 +278,14 @@ export async function runSessionEnd(inputPayload?: HookPayload): Promise<void> {
     files: session.edited_files,
     ts: nowIso(),
     summary: null,
-    importance: "normal"
+    importance: "normal",
+    ...(typeof payload.transcript_path === "string" && payload.transcript_path
+      ? { transcript_path: payload.transcript_path }
+      : {})
   };
   await appendEvent(paths, event);
   breadcrumb(
-    `session-end: module=${event.module ?? "none"}, ${event.files.length} file(s) touched`
+    `session-end: module=${event.module ?? "none"}, ${event.files.length} file(s) touched${event.transcript_path ? ", transcript recorded" : ""}`
   );
 }
 

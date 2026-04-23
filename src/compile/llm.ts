@@ -16,12 +16,22 @@ interface ModelResponse {
   notes?: string;
 }
 
+const CROSS_CUTTING_TYPES = new Set(["session_summary", "learned_fact", "user_instruction"]);
+
+function isRelevantToModule(e: MemoryEvent, moduleId: string): boolean {
+  if (e.module === moduleId) return true;
+  if (e.module === null && e.importance === "high" && CROSS_CUTTING_TYPES.has(e.type)) {
+    return true;
+  }
+  return false;
+}
+
 function buildPrompt(
   moduleId: string,
   currentPages: Record<PageName, string>,
   events: MemoryEvent[]
 ): string {
-  const relevant = events.filter((e) => e.module === moduleId);
+  const relevant = events.filter((e) => isRelevantToModule(e, moduleId));
   const summaries = relevant.map(summarizeEvent).join("\n");
 
   return [

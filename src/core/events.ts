@@ -14,6 +14,8 @@ import type { MemoryPaths } from "./paths.js";
 export type EventType =
   | "file_write"
   | "session_close"
+  | "session_summary"
+  | "learned_fact"
   | "user_instruction"
   | "user_prompt";
 export type Importance = "normal" | "high";
@@ -40,6 +42,7 @@ export interface MemoryEvent {
   ts: string;
   summary: string | null;
   importance: Importance;
+  transcript_path?: string;
 }
 
 const PREVIEW_LIMIT = 500;

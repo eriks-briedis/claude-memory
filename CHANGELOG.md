@@ -4,6 +4,46 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-04-23
+
+### Added
+- **Session-end transcript summarization.** The `Stop` hook now captures the
+  Claude Code `transcript_path` on the `session_close` event. A new compile
+  pass (`compile/summarize-sessions.ts`) replays un-summarized transcripts
+  through `claude -p` and emits `session_summary` events — one per module
+  discussed — which then feed the LLM pass alongside regular `file_write`
+  events. Review-style sessions that touched no files now leave durable
+  memory instead of vanishing at Stop.
+- **`session_summary` and `learned_fact` event types.** Both are first-class
+  inputs to the LLM pass. `learned_fact` is for Claude to volunteer during a
+  session; the CLAUDE.md template now documents the schema and when to use
+  `importance: high`.
+- **Module-null high-importance events now reach the LLM.** Previously the
+  LLM pass filtered strictly by `e.module === moduleId`, so cross-cutting
+  summaries and user instructions never surfaced. The filter now also admits
+  `session_summary`, `learned_fact`, and `user_instruction` events with
+  `module: null` when `importance: high`.
+- **`path-in-prompt` resolution pass.** If the user pastes a literal path
+  matching any module's `owned_paths` prefix (`services/disputes/...`,
+  `src/compile/...`), that module wins — even over an incidentally-appearing
+  alias word in the same sentence. Longest matching prefix wins; equal-length
+  ties return null. New `ResolvedModule.matchedPath` exposes the match.
+- **Per-write module re-resolution in `post-write`.** `file_write` events are
+  now tagged using `resolveFromEditedFiles` against the actual file path, not
+  just the stale `session.resolved_module` decided at prompt time. A confident
+  hit also promotes `session.resolved_module` so subsequent writes in the
+  same session benefit. Cuts the null/wrong-module tagging rate dramatically
+  on ambiguous prompts like "fix this bug".
+- **GitHub Actions.** `test.yml` runs `npm ci && npm run build && npm test`
+  on every branch push and PR. `publish.yml` publishes to npm on push to
+  `master` via Trusted Publishing (OIDC, no long-lived tokens) with
+  `--provenance`; already-published versions are detected and skipped.
+
+### Changed
+- **Resolver cascade re-ordered: path → alias → fuzzy.** Path-in-prompt now
+  runs *before* alias-exact. When both could match, pasted paths are the more
+  specific signal of intent.
+
 ## [0.5.1] - 2026-04-23
 
 ### Added
@@ -180,6 +220,8 @@ pick up the new hook entry, or add it manually to `.claude/settings.json`.
   open-question flagging), LLM pass via `claude -p`, wiki lint.
 - Starter wiki skeleton with a sample module seeded by `init`.
 
+[0.6.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.6.0
+[0.5.1]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.5.1
 [0.5.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.5.0
 [0.4.1]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.4.1
 [0.4.0]: https://www.npmjs.com/package/@briedis/claude-memory/v/0.4.0

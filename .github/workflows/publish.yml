@@ -1,0 +1,43 @@
+name: publish
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      # Trusted Publishing requires npm >= 11.5.1; Node 20 ships with npm 10.
+      - name: Upgrade npm for Trusted Publishing support
+        run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Check whether the current version is already published
+        id: check
+        run: |
+          pkg=$(node -p "require('./package.json').name")
+          ver=$(node -p "require('./package.json').version")
+          if npm view "$pkg@$ver" version > /dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$pkg@$ver is already published; skipping."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm (Trusted Publishing via OIDC)
+        if: steps.check.outputs.already == 'false'
+        run: npm publish --access public --provenance

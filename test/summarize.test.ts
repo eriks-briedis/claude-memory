@@ -82,4 +82,35 @@ describe("summarizeEvent", () => {
     };
     expect(summarizeEvent(e)).toContain("explain the ledger");
   });
+
+  it("summarizes session_summary with importance tag", () => {
+    const e: MemoryEvent = {
+      type: "session_summary",
+      session_id: "s",
+      module: "example",
+      files: [],
+      ts: "2026-04-22T12:00:00.000Z",
+      summary: "Ledger reconciles by row id; null rows are treated as zero.",
+      importance: "high"
+    };
+    const s = summarizeEvent(e);
+    expect(s).toContain("session_summary");
+    expect(s).toContain("high");
+    expect(s).toContain("Ledger reconciles");
+  });
+
+  it("summarizes learned_fact with importance tag", () => {
+    const e: MemoryEvent = {
+      type: "learned_fact",
+      session_id: "s",
+      module: "example",
+      files: [],
+      ts: "2026-04-22T12:00:00.000Z",
+      summary: "Resolver treats aliases case-insensitively after v0.5.",
+      importance: "normal"
+    };
+    const s = summarizeEvent(e);
+    expect(s).toContain("learned_fact");
+    expect(s).toContain("Resolver treats aliases");
+  });
 });

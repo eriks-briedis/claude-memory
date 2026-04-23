@@ -97,4 +97,81 @@ describe("resolveModule", () => {
     const r = resolveModule(config, "fix the clearance bug", []);
     expect(r?.matchedAlias).toBe("clearance");
   });
+
+  it("resolves via path-in-prompt when the user pastes an owned_paths prefix", () => {
+    const r = resolveModule(
+      config,
+      "take a look at services/disputes/handler.ts please",
+      []
+    );
+    expect(r?.id).toBe("disputes");
+    expect(r?.reason).toBe("path-in-prompt");
+    expect(r?.matchedPath).toBe("services/disputes");
+  });
+
+  it("path-in-prompt prefers the longest matching prefix on nested paths", () => {
+    const cfg: Config = {
+      ...config,
+      modules: {
+        "account-clearance": config.modules["account-clearance"],
+        "account-clearance-ui": {
+          aliases: ["clearance-ui"],
+          wiki_path: "wiki/modules/account-clearance-ui",
+          owned_paths: ["ui/account-clearance/components/**"],
+          related_cross_cutting: []
+        }
+      }
+    };
+    const r = resolveModule(
+      cfg,
+      "look at ui/account-clearance/components/row.tsx",
+      []
+    );
+    expect(r?.id).toBe("account-clearance-ui");
+    expect(r?.reason).toBe("path-in-prompt");
+  });
+
+  it("path-in-prompt returns null when two modules have equally long prefixes", () => {
+    const cfg: Config = {
+      ...config,
+      modules: {
+        a: {
+          aliases: [],
+          wiki_path: "wiki/modules/a",
+          owned_paths: ["pkg/a/**"],
+          related_cross_cutting: []
+        },
+        b: {
+          aliases: [],
+          wiki_path: "wiki/modules/b",
+          owned_paths: ["pkg/b/**"],
+          related_cross_cutting: []
+        }
+      }
+    };
+    const r = resolveModule(cfg, "touching pkg/a and pkg/b", []);
+    expect(r).toBeNull();
+  });
+
+  it("path-in-prompt wins over alias-exact when the user pastes a file path", () => {
+    // Pasted path is a stronger signal of intent than an alias word appearing
+    // incidentally in the surrounding sentence.
+    const r = resolveModule(
+      config,
+      "fix the clearance bug in services/disputes/foo.ts",
+      []
+    );
+    expect(r?.reason).toBe("path-in-prompt");
+    expect(r?.id).toBe("disputes");
+  });
+
+  it("path-in-prompt beats fuzzy match on a near-miss alias", () => {
+    const r = resolveModule(
+      config,
+      "check services/disputes/handler.ts for the dispte edge case",
+      []
+    );
+    expect(r?.id).toBe("disputes");
+    expect(r?.reason).toBe("path-in-prompt");
+  });
 });

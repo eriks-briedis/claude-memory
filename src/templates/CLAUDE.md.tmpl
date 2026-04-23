@@ -15,6 +15,26 @@ If the user says "remember that X" or "note that X":
 - Append a `user_instruction` event to `.claude-memory/raw/events/` with `importance: high`.
 - Do not wait for confirmation.
 
+### Volunteering facts you learned
+
+If during a session you invested meaningful effort understanding a module (tracing code paths, inferring invariants, clarifying an API contract) and the next session would benefit from knowing it, append a `learned_fact` event to `.claude-memory/raw/events/` before the session ends. Schema:
+
+```json
+{
+  "type": "learned_fact",
+  "session_id": "<session id>",
+  "module": "<module id or null if cross-cutting>",
+  "files": [],
+  "summary": "<one paragraph, <200 words — what you learned, not what you did>",
+  "importance": "normal" | "high",
+  "ts": "<ISO-8601 UTC timestamp>"
+}
+```
+
+Use `high` only for facts a future session would regret missing (invariants, non-obvious API contracts, traps). Use `normal` for context that is useful but recoverable. The compiler promotes these into the wiki.
+
+A session-end summary is also produced automatically from the transcript, so do not duplicate — only volunteer facts that are concrete and worth emphasizing.
+
 ### Do not
 
 - Rewrite canonical wiki pages directly unless explicitly asked.

@@ -5,13 +5,20 @@ import type { Config, ModuleConfig } from "./config.js";
 export interface ResolvedModule {
   id: string;
   module: ModuleConfig;
-  reason: "alias-exact" | "alias-fuzzy" | "recent-edits" | "session-sticky";
+  reason:
+    | "alias-exact"
+    | "path-in-prompt"
+    | "alias-fuzzy"
+    | "recent-edits"
+    | "session-sticky";
   score?: number;
   matchedAlias?: string;
+  matchedPath?: string;
 }
 
 const FUZZY_THRESHOLD = 0.85;
 const MIN_FUZZY_TOKEN_LEN = 4;
+const MIN_PATH_PREFIX_LEN = 4;
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -30,7 +37,53 @@ function tokenize(prompt: string): string[] {
     .filter((t) => t.length >= MIN_FUZZY_TOKEN_LEN);
 }
 
+function pathPrefix(glob: string): string {
+  let end = glob.length;
+  for (let i = 0; i < glob.length; i++) {
+    const ch = glob[i];
+    if (ch === "*" || ch === "?" || ch === "[" || ch === "{") {
+      end = i;
+      break;
+    }
+  }
+  let pref = glob.slice(0, end);
+  while (pref.endsWith("/")) pref = pref.slice(0, -1);
+  return pref;
+}
+
+export function resolveFromPathsInPrompt(
+  config: Config,
+  prompt: string
+): ResolvedModule | null {
+  const lower = prompt.toLowerCase();
+  const matches: Array<{ id: string; module: ModuleConfig; prefix: string }> = [];
+  for (const [id, mod] of Object.entries(config.modules)) {
+    let bestPrefix: string | null = null;
+    for (const glob of mod.owned_paths) {
+      const pref = pathPrefix(glob);
+      if (pref.length < MIN_PATH_PREFIX_LEN) continue;
+      if (!lower.includes(pref.toLowerCase())) continue;
+      if (!bestPrefix || pref.length > bestPrefix.length) bestPrefix = pref;
+    }
+    if (bestPrefix) matches.push({ id, module: mod, prefix: bestPrefix });
+  }
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => b.prefix.length - a.prefix.length);
+  if (matches.length > 1 && matches[0].prefix.length === matches[1].prefix.length) {
+    return null;
+  }
+  return {
+    id: matches[0].id,
+    module: matches[0].module,
+    reason: "path-in-prompt",
+    matchedPath: matches[0].prefix
+  };
+}
+
 export function resolveFromPrompt(config: Config, prompt: string): ResolvedModule | null {
+  const pathHit = resolveFromPathsInPrompt(config, prompt);
+  if (pathHit) return pathHit;
+
   for (const [id, mod] of Object.entries(config.modules)) {
     for (const alias of mod.aliases) {
       if (aliasMatchesPrompt(alias, prompt)) {

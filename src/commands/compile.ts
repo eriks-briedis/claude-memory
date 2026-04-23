@@ -12,6 +12,7 @@ import {
 } from "../compile/deterministic.js";
 import { lintWiki } from "../compile/lint.js";
 import { runLlmPass } from "../compile/llm.js";
+import { runSessionSummaryPass } from "../compile/summarize-sessions.js";
 
 function ensureLockFile(paths: MemoryPaths): string {
   mkdirSync(paths.stateDir, { recursive: true });
@@ -20,22 +21,16 @@ function ensureLockFile(paths: MemoryPaths): string {
   return lockPath;
 }
 
-async function runCompileLocked(
-  paths: MemoryPaths,
-  opts: { llm?: boolean }
-): Promise<void> {
-  const config = loadConfig(paths.configFile);
-  const lastCompiled = readLastCompiled(paths);
-  const eventFiles = listEventFiles(paths);
-  const allEvents = [];
-  for (const f of eventFiles) {
+function loadAllEvents(paths: MemoryPaths) {
+  const events = [];
+  for (const f of listEventFiles(paths)) {
     try {
       const e = readEventFile(f);
       if (typeof e.ts !== "string") {
         console.error(chalk.yellow(`skipping ${f}: missing "ts"`));
         continue;
       }
-      allEvents.push(e);
+      events.push(e);
     } catch (err) {
       console.error(
         chalk.yellow(
@@ -44,7 +39,17 @@ async function runCompileLocked(
       );
     }
   }
-  const newEvents = filterNewEvents(allEvents, lastCompiled);
+  return events;
+}
+
+async function runCompileLocked(
+  paths: MemoryPaths,
+  opts: { llm?: boolean }
+): Promise<void> {
+  const config = loadConfig(paths.configFile);
+  const lastCompiled = readLastCompiled(paths);
+  let allEvents = loadAllEvents(paths);
+  let newEvents = filterNewEvents(allEvents, lastCompiled);
 
   if (newEvents.length === 0) {
     console.log(chalk.dim("No new events since last compile."));
@@ -54,6 +59,14 @@ async function runCompileLocked(
         `Processing ${newEvents.length} events since ${lastCompiled ?? "beginning"}.`
       )
     );
+  }
+
+  if (opts.llm !== false) {
+    const added = await runSessionSummaryPass(paths, config, allEvents);
+    if (added.length > 0) {
+      allEvents = [...allEvents, ...added];
+      newEvents = [...newEvents, ...added];
+    }
   }
 
   const det = runDeterministic(paths, config, newEvents, allEvents);
