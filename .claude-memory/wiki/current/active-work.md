@@ -1,3 +1,8 @@
 # Active work
 
-_Compiler-maintained. Lists modules touched in the last 7 days._
+_Compiler-maintained. Modules touched in the last 7 days._
+
+- bootstrap
+- commands
+- compile
+- core

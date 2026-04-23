@@ -10,7 +10,7 @@ import {
   type Importance,
   type MemoryEvent
 } from "../core/events.js";
-import { extractJson, invokeClaude } from "../util/claude.js";
+import { invokeClaude, parseJsonResponse } from "../util/claude.js";
 
 interface ModelSummary {
   module?: string | null;
@@ -89,6 +89,22 @@ function validateModule(
   return moduleIds.has(raw) ? raw : null;
 }
 
+async function emitSentinel(
+  paths: MemoryPaths,
+  closeEvent: MemoryEvent
+): Promise<void> {
+  const event: MemoryEvent = {
+    type: "session_summary",
+    session_id: closeEvent.session_id,
+    module: null,
+    files: closeEvent.files,
+    ts: nowIso(),
+    summary: null,
+    importance: "normal"
+  };
+  await appendEvent(paths, event);
+}
+
 async function summarizeSession(
   paths: MemoryPaths,
   config: Config,
@@ -97,7 +113,13 @@ async function summarizeSession(
   const transcript = closeEvent.transcript_path
     ? readTranscript(closeEvent.transcript_path)
     : null;
-  if (!transcript || transcript.trim().length === 0) return 0;
+  if (!transcript || transcript.trim().length === 0) {
+    await emitSentinel(paths, closeEvent);
+    console.log(
+      chalk.dim(`[session-summary] ${closeEvent.session_id}: empty transcript (sentinel)`)
+    );
+    return 0;
+  }
 
   const moduleIds = Object.keys(config.modules);
   const prompt = buildPrompt(
@@ -112,6 +134,7 @@ async function summarizeSession(
     const result = await invokeClaude(prompt, { timeoutMs: 3 * 60_000 });
     raw = result.stdout;
   } catch (err) {
+    // Transient error — do NOT emit sentinel; let a later compile retry.
     console.error(
       chalk.yellow(
         `[session-summary] ${closeEvent.session_id}: skipped (${err instanceof Error ? err.message : String(err)})`
@@ -120,9 +143,14 @@ async function summarizeSession(
     return 0;
   }
 
-  const response = extractJson<ModelResponse>(raw, UNPARSEABLE);
+  const diag = parseJsonResponse<ModelResponse>(raw);
+  const response = diag.value ?? UNPARSEABLE;
   if (response.no_update || !response.summaries || response.summaries.length === 0) {
-    console.log(chalk.dim(`[session-summary] ${closeEvent.session_id}: no update`));
+    await emitSentinel(paths, closeEvent);
+    const reason = diag.error ? `parse error: ${diag.error}` : "no update";
+    console.log(
+      chalk.dim(`[session-summary] ${closeEvent.session_id}: ${reason} (sentinel)`)
+    );
     return 0;
   }
 
@@ -149,6 +177,13 @@ async function summarizeSession(
     await appendEvent(paths, event);
     added++;
   }
+  if (added === 0) {
+    await emitSentinel(paths, closeEvent);
+    console.log(
+      chalk.dim(`[session-summary] ${closeEvent.session_id}: no valid summaries (sentinel)`)
+    );
+    return 0;
+  }
   console.log(
     chalk.green(
       `[session-summary] ${closeEvent.session_id}: ${added} summary event(s) added`
@@ -167,12 +202,20 @@ export async function runSessionSummaryPass(
       .filter((e) => e.type === "session_summary")
       .map((e) => e.session_id)
   );
-  const pending = allEvents.filter(
-    (e) =>
+  // Multiple session_close events can exist for the same session (Stop hook fires per-invocation).
+  // Deduplicate by session_id, keeping the last close event (most recent transcript).
+  const pendingMap = new Map<string, MemoryEvent>();
+  for (const e of allEvents) {
+    if (
       e.type === "session_close" &&
       typeof e.transcript_path === "string" &&
+      e.session_id &&
       !summarized.has(e.session_id)
-  );
+    ) {
+      pendingMap.set(e.session_id, e);
+    }
+  }
+  const pending = Array.from(pendingMap.values());
 
   if (pending.length === 0) return [];
 

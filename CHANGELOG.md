@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-04-23
+
+### Fixed
+- **Duplicate session summarization.** The `Stop` hook fires once per
+  `claude` invocation, so a session with multiple sub-invocations accumulated
+  multiple `session_close` events sharing the same `session_id`.
+  `runSessionSummaryPass` now deduplicates by `session_id` before the LLM
+  loop, so each session is summarized exactly once instead of once per Stop.
+
 ## [0.6.0] - 2026-04-23
 
 ### Added
