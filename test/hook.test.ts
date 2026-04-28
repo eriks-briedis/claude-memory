@@ -285,6 +285,35 @@ describe("hook events", () => {
     expect(sessionAfter?.resolved_module).toBe("example");
   });
 
+  it("pre-task does not re-inject pages already sent in the same session", async () => {
+    const root = await initRepo();
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    const captures: string[] = [];
+    (process.stdout as { write: typeof process.stdout.write }).write = ((
+      chunk: string | Uint8Array
+    ) => {
+      captures.push(chunk.toString());
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      await inCwd(root, () =>
+        runPreTask({ session_id: "dedup1", prompt: "work on the example module" })
+      );
+      await inCwd(root, () =>
+        runPreTask({ session_id: "dedup1", prompt: "continue working on example" })
+      );
+    } finally {
+      (process.stdout as { write: typeof process.stdout.write }).write = origWrite;
+    }
+
+    expect(captures).toHaveLength(1);
+    const first = JSON.parse(captures[0]);
+    const firstContext: string = first.hookSpecificOutput?.additionalContext ?? "";
+    expect(firstContext.length).toBeGreaterThan(0);
+  });
+
   it("post-write falls back to session.resolved_module when file path matches no module", async () => {
     const root = await initRepo();
     await inCwd(root, () =>

@@ -176,13 +176,24 @@ export async function runPreTask(inputPayload?: HookPayload): Promise<void> {
   }
 
   const loaded = loadContext(paths, config, resolved);
-  const context = formatContext(loaded);
+  const alreadyInjected = new Set(prior?.injected_pages ?? []);
+  const newPages = loaded.pages.filter((p) => !alreadyInjected.has(p.path));
+  const context = formatContext({ ...loaded, pages: newPages });
+
+  const newPagePaths = newPages.map((p) => p.path);
+  if (newPagePaths.length > 0) {
+    upsertSession(paths, sessionId, {
+      injected_pages: [...(prior?.injected_pages ?? []), ...newPagePaths]
+    });
+  }
 
   const moduleLabel = resolved
     ? `${resolved.id} (${resolved.reason}${resolved.matchedAlias ? `:${resolved.matchedAlias}` : ""})`
     : "none";
+  const deduped = loaded.pages.length - newPages.length;
   const skippedNote = loaded.skipped.length > 0 ? `, skipped ${loaded.skipped.length}` : "";
-  const summary = `pre-task: module=${moduleLabel}, loaded ${loaded.pages.length} page(s), ${loaded.totalTokens} token(s)${skippedNote}`;
+  const dedupNote = deduped > 0 ? `, deduped ${deduped}` : "";
+  const summary = `pre-task: module=${moduleLabel}, loaded ${newPages.length} page(s), ${loaded.totalTokens} token(s)${skippedNote}${dedupNote}`;
   breadcrumb(summary);
 
   const output: {

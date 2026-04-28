@@ -6,7 +6,7 @@ const program = new Command();
 program
   .name("claude-memory")
   .description("Per-project memory wiki for Claude Code.")
-  .version("0.6.1");
+  .version("0.6.2");
 
 program
   .command("init")

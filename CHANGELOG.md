@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.2] - 2026-04-28
+
+### Fixed
+- **Duplicate context injection within a session.** The `UserPromptSubmit` hook
+  previously re-injected the same wiki pages on every prompt in a conversation.
+  Pages are now tracked in session state (`injected_pages`) and each page is
+  sent at most once per session.
+
 ## [0.6.1] - 2026-04-23
 
 ### Fixed

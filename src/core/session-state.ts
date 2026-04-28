@@ -9,6 +9,7 @@ export interface SessionState {
   resolved_module: string | null;
   edited_files: string[];
   prompt_history: string[];
+  injected_pages: string[];
 }
 
 function sessionFile(paths: MemoryPaths, sessionId: string): string {
@@ -48,6 +49,7 @@ export function upsertSession(
         resolved_module: null,
         edited_files: [],
         prompt_history: [],
+        injected_pages: [],
         ...patch
       };
   writeSession(paths, merged);
