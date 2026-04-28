@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-04-28
+
+### Added
+- **Auto-compile from session-end.** The `Stop` hook now detaches a
+  `claude-memory compile` process after appending the `session_close`
+  event, so the wiki stays fresh without manual runs. The detached
+  process logs to `.claude-memory/state/compile.log` (rotated at 1 MB)
+  and is serialized by the existing `proper-lockfile`, so back-to-back
+  sessions are safe. Spawn failures are swallowed — auto-compile must
+  never break Stop.
+- New config field `project.auto_compile` (default `true`). Set to
+  `false` to disable and run compile manually or via cron.
+
 ## [0.6.4] - 2026-04-28
 
 ### Added

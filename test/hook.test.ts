@@ -23,6 +23,13 @@ async function initRepo(): Promise<string> {
   } finally {
     process.chdir(prev);
   }
+  // Tests must not fork real compile processes from session-end.
+  const cfgPath = join(root, ".claude-memory", "config.yaml");
+  const cfg = readFileSync(cfgPath, "utf8").replace(
+    "auto_compile: true",
+    "auto_compile: false"
+  );
+  writeFileSync(cfgPath, cfg);
   return root;
 }
 

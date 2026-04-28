@@ -1,6 +1,9 @@
 project:
   id: {{project_id}}
   memory_enabled: true
+  # When true, the session-end hook detaches a `claude-memory compile` process
+  # so the wiki stays fresh without manual runs. Set false to disable.
+  auto_compile: true
 
 retrieval:
   always_read:

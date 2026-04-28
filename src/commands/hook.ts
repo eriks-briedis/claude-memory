@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { loadConfig } from "../core/config.js";
 import { resolvePaths } from "../core/paths.js";
+import { triggerAutoCompile } from "./auto-compile.js";
 import { resolveFromEditedFiles, resolveModule } from "../core/resolver.js";
 import { loadContext, formatContext } from "../core/context-loader.js";
 import {
@@ -299,6 +300,11 @@ export async function runSessionEnd(inputPayload?: HookPayload): Promise<void> {
   breadcrumb(
     `session-end: module=${event.module ?? "none"}, ${event.files.length} file(s) touched${event.transcript_path ? ", transcript recorded" : ""}`
   );
+
+  if (config.project.auto_compile !== false) {
+    const spawned = triggerAutoCompile(paths);
+    if (spawned) breadcrumb("session-end: auto-compile spawned");
+  }
 }
 
 const SESSION_START_INJECTION_DAYS = 14;

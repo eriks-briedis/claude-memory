@@ -12,7 +12,8 @@ const ModuleSchema = z.object({
 const ConfigSchema = z.object({
   project: z.object({
     id: z.string(),
-    memory_enabled: z.boolean().default(true)
+    memory_enabled: z.boolean().default(true),
+    auto_compile: z.boolean().default(true)
   }),
   retrieval: z
     .object({
