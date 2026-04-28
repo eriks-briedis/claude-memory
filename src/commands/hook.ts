@@ -300,13 +300,19 @@ export async function runSessionEnd(inputPayload?: HookPayload): Promise<void> {
   );
 }
 
+const SESSION_START_INJECTION_DAYS = 14;
+
 function readHighImportance(paths: ReturnType<typeof resolvePaths>): MemoryEvent[] {
   if (!paths) return [];
+  const cutoff = Date.now() - SESSION_START_INJECTION_DAYS * 86400_000;
   const out: MemoryEvent[] = [];
   for (const f of listEventFiles(paths)) {
     try {
       const e = readEventFile(f);
-      if (e.importance === "high") out.push(e);
+      if (e.importance !== "high") continue;
+      const t = Date.parse(e.ts);
+      if (Number.isNaN(t) || t < cutoff) continue;
+      out.push(e);
     } catch {
       /* ignore malformed */
     }

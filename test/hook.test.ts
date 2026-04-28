@@ -256,6 +256,61 @@ describe("hook events", () => {
     );
   });
 
+  it("session-start excludes high-importance events older than 14 days", async () => {
+    const root = await initRepo();
+    const paths = buildPaths(root);
+    const oldTs = new Date(Date.now() - 30 * 86400_000).toISOString();
+    const recentTs = new Date(Date.now() - 1 * 86400_000).toISOString();
+    await appendEvent(paths, {
+      type: "user_instruction",
+      session_id: "old",
+      module: "example",
+      files: [],
+      prompt: "ancient note that should not resurface",
+      ts: oldTs,
+      summary: null,
+      importance: "high"
+    });
+    await appendEvent(paths, {
+      type: "user_instruction",
+      session_id: "recent",
+      module: "example",
+      files: [],
+      prompt: "fresh note within window",
+      ts: recentTs,
+      summary: null,
+      importance: "high"
+    });
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    let captured = "";
+    (process.stdout as { write: typeof process.stdout.write }).write = ((
+      chunk: string | Uint8Array
+    ) => {
+      captured += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      await inCwd(root, () =>
+        runSessionStart({ session_id: "new", source: "startup" })
+      );
+    } finally {
+      (process.stdout as { write: typeof process.stdout.write }).write = origWrite;
+    }
+
+    const parsed = JSON.parse(captured);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "fresh note within window"
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+      "ancient note"
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "1 open question(s)"
+    );
+  });
+
   it("post-write tags event via file-path resolution even when prompt did not resolve", async () => {
     const root = await initRepo();
     await inCwd(root, () =>

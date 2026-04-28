@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.3] - 2026-04-28
+
+### Fixed
+- **SessionStart context noise.** `runSessionStart` injected every
+  high-importance event ever recorded, even after its content had been
+  promoted into a canonical wiki page. The hook now only surfaces
+  high-importance events from the last 14 days, capping the recurring
+  injection to a sliding window. The on-disk `open-questions.md` is
+  unchanged and still lists the full history.
+
 ## [0.6.2] - 2026-04-28
 
 ### Fixed

@@ -1,12 +1,19 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { Command } from "commander";
+
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"), "utf8")
+) as { version: string };
 
 const program = new Command();
 
 program
   .name("claude-memory")
   .description("Per-project memory wiki for Claude Code.")
-  .version("0.6.2");
+  .version(pkg.version);
 
 program
   .command("init")
