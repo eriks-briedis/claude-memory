@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.4] - 2026-04-28
+
+### Added
+- **Promotion markers.** When `runLlmPass` updates a module wiki page, it now
+  appends a `promotion` event listing the source `consumed_event_ids` it
+  considered. `open-questions.md` and the `SessionStart` injection skip
+  events whose IDs appear in any prior promotion, so a high-importance
+  fact that has been merged into a canonical page drops off immediately
+  rather than waiting for the 14-day window to slide.
+- New `promotion` event type and `consumed_event_ids` field in `MemoryEvent`.
+- `readEventFile` populates an in-memory `_id` (file basename, e.g.
+  `2026-04-23_001`); stripped on `appendEvent` so on-disk shape is unchanged.
+- `collectPromotedIds(events)` helper exported from `core/events.ts`.
+
 ## [0.6.3] - 2026-04-28
 
 ### Fixed

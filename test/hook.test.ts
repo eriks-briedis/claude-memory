@@ -256,6 +256,69 @@ describe("hook events", () => {
     );
   });
 
+  it("session-start excludes promoted high-importance events", async () => {
+    const root = await initRepo();
+    const paths = buildPaths(root);
+    const recentTs = new Date(Date.now() - 1 * 86400_000).toISOString();
+    const promotedFile = await appendEvent(paths, {
+      type: "session_summary",
+      session_id: "prior",
+      module: "example",
+      files: [],
+      ts: recentTs,
+      summary: "this fact has already been merged into a wiki page",
+      importance: "high"
+    });
+    await appendEvent(paths, {
+      type: "session_summary",
+      session_id: "prior",
+      module: "example",
+      files: [],
+      ts: recentTs,
+      summary: "this one is still pending promotion",
+      importance: "high"
+    });
+    const promotedId = promotedFile.split("/").pop()!.replace(/\.json$/, "");
+    await appendEvent(paths, {
+      type: "promotion",
+      session_id: "compile",
+      module: "example",
+      files: [],
+      ts: new Date().toISOString(),
+      summary: null,
+      importance: "normal",
+      consumed_event_ids: [promotedId]
+    });
+
+    const origWrite = process.stdout.write.bind(process.stdout);
+    let captured = "";
+    (process.stdout as { write: typeof process.stdout.write }).write = ((
+      chunk: string | Uint8Array
+    ) => {
+      captured += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      await inCwd(root, () =>
+        runSessionStart({ session_id: "new", source: "startup" })
+      );
+    } finally {
+      (process.stdout as { write: typeof process.stdout.write }).write = origWrite;
+    }
+
+    const parsed = JSON.parse(captured);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "still pending promotion"
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+      "already been merged"
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "1 open question(s)"
+    );
+  });
+
   it("session-start excludes high-importance events older than 14 days", async () => {
     const root = await initRepo();
     const paths = buildPaths(root);

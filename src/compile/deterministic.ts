@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Config } from "../core/config.js";
 import type { MemoryPaths } from "../core/paths.js";
-import type { MemoryEvent } from "../core/events.js";
+import { collectPromotedIds, type MemoryEvent } from "../core/events.js";
 
 export interface DeterministicResult {
   modulesTouched: string[];
@@ -138,7 +138,10 @@ export function runDeterministic(
   }
   rewriteActiveWork(paths, [...last7Days]);
 
-  const historicOpen = allEvents.filter((e) => e.importance === "high");
+  const promoted = collectPromotedIds(allEvents);
+  const historicOpen = allEvents.filter(
+    (e) => e.importance === "high" && !(e._id && promoted.has(e._id))
+  );
   rewriteOpenQuestions(paths, historicOpen);
 
   const filesPerModule = collectFilesPerModule(allEvents);

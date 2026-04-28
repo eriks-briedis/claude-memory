@@ -10,6 +10,7 @@ import {
 } from "../core/session-state.js";
 import {
   appendEvent,
+  collectPromotedIds,
   listEventFiles,
   nowIso,
   readEventFile,
@@ -305,18 +306,21 @@ const SESSION_START_INJECTION_DAYS = 14;
 function readHighImportance(paths: ReturnType<typeof resolvePaths>): MemoryEvent[] {
   if (!paths) return [];
   const cutoff = Date.now() - SESSION_START_INJECTION_DAYS * 86400_000;
-  const out: MemoryEvent[] = [];
+  const all: MemoryEvent[] = [];
   for (const f of listEventFiles(paths)) {
     try {
-      const e = readEventFile(f);
-      if (e.importance !== "high") continue;
-      const t = Date.parse(e.ts);
-      if (Number.isNaN(t) || t < cutoff) continue;
-      out.push(e);
+      all.push(readEventFile(f));
     } catch {
       /* ignore malformed */
     }
   }
+  const promoted = collectPromotedIds(all);
+  const out = all.filter((e) => {
+    if (e.importance !== "high") return false;
+    if (e._id && promoted.has(e._id)) return false;
+    const t = Date.parse(e.ts);
+    return !Number.isNaN(t) && t >= cutoff;
+  });
   return out.sort((a, b) => (a.ts < b.ts ? 1 : -1));
 }
 

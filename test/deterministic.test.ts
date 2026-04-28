@@ -121,6 +121,37 @@ describe("runDeterministic", () => {
     expect(open).toContain("ledger must reconcile");
   });
 
+  it("excludes promoted high-importance events from open-questions", () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-det-"));
+    const paths = buildPaths(root);
+    seedWiki(paths);
+    const promotedFact = ev("disputes", [], new Date().toISOString(), {
+      type: "session_summary",
+      importance: "high",
+      summary: "fact already merged into wiki",
+      _id: "2026-04-23_001"
+    });
+    const stillOpen = ev("disputes", [], new Date().toISOString(), {
+      type: "session_summary",
+      importance: "high",
+      summary: "fact not yet merged",
+      _id: "2026-04-23_002"
+    });
+    const promotion = ev("disputes", [], new Date().toISOString(), {
+      type: "promotion",
+      importance: "normal",
+      consumed_event_ids: ["2026-04-23_001"]
+    });
+    const all = [promotedFact, stillOpen, promotion];
+    runDeterministic(paths, config, all, all);
+    const open = readFileSync(
+      join(paths.wikiDir, "current", "open-questions.md"),
+      "utf8"
+    );
+    expect(open).toContain("not yet merged");
+    expect(open).not.toContain("already merged");
+  });
+
   it("writes (none) to open-questions when empty", () => {
     const root = mkdtempSync(join(tmpdir(), "cm-det-"));
     const paths = buildPaths(root);

@@ -7,7 +7,7 @@ import {
   readdirSync,
   writeFileSync
 } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import lockfile from "proper-lockfile";
 import type { MemoryPaths } from "./paths.js";
 
@@ -17,7 +17,8 @@ export type EventType =
   | "session_summary"
   | "learned_fact"
   | "user_instruction"
-  | "user_prompt";
+  | "user_prompt"
+  | "promotion";
 export type Importance = "normal" | "high";
 
 export interface FileChange {
@@ -43,6 +44,23 @@ export interface MemoryEvent {
   summary: string | null;
   importance: Importance;
   transcript_path?: string;
+  consumed_event_ids?: string[];
+  /** Basename of the source file (no extension). Set by `readEventFile`; not persisted. */
+  _id?: string;
+}
+
+export function eventIdFromFile(file: string): string {
+  return basename(file).replace(/\.json$/, "");
+}
+
+export function collectPromotedIds(events: MemoryEvent[]): Set<string> {
+  const out = new Set<string>();
+  for (const e of events) {
+    if (e.type !== "promotion") continue;
+    if (!Array.isArray(e.consumed_event_ids)) continue;
+    for (const id of e.consumed_event_ids) out.add(id);
+  }
+  return out;
 }
 
 const PREVIEW_LIMIT = 500;
@@ -100,7 +118,8 @@ export async function appendEvent(
   const date = event.ts.slice(0, 10);
   const n = await nextCounter(paths, date);
   const file = join(paths.eventsDir, `${date}_${String(n).padStart(3, "0")}.json`);
-  writeFileSync(file, JSON.stringify(event, null, 2));
+  const { _id: _ignored, ...persisted } = event;
+  writeFileSync(file, JSON.stringify(persisted, null, 2));
   return file;
 }
 
@@ -113,7 +132,9 @@ export function listEventFiles(paths: MemoryPaths): string[] {
 }
 
 export function readEventFile(file: string): MemoryEvent {
-  return JSON.parse(readFileSync(file, "utf8")) as MemoryEvent;
+  const event = JSON.parse(readFileSync(file, "utf8")) as MemoryEvent;
+  event._id = eventIdFromFile(file);
+  return event;
 }
 
 export function nowIso(): string {

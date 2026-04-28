@@ -3,7 +3,7 @@ import { join } from "node:path";
 import chalk from "chalk";
 import type { Config } from "../core/config.js";
 import type { MemoryPaths } from "../core/paths.js";
-import type { MemoryEvent } from "../core/events.js";
+import { appendEvent, nowIso, type MemoryEvent } from "../core/events.js";
 import { summarizeEvent } from "./summarize.js";
 import { extractJson, invokeClaude } from "../util/claude.js";
 
@@ -108,11 +108,33 @@ export async function runLlmPass(
       continue;
     }
     const pages = response.pages ?? {};
+    let wrote = false;
     for (const p of PAGES) {
       const next = pages[p];
       if (typeof next === "string" && next.trim().length > 0) {
         writePage(moduleDir, p, next);
         console.log(chalk.green(`[llm] ${moduleId}: updated ${p}`));
+        wrote = true;
+      }
+    }
+    if (wrote) {
+      const consumed = events
+        .filter((e) => isRelevantToModule(e, moduleId) && e.importance === "high" && e._id)
+        .map((e) => e._id as string);
+      if (consumed.length > 0) {
+        await appendEvent(paths, {
+          type: "promotion",
+          session_id: "compile",
+          module: moduleId,
+          files: [],
+          ts: nowIso(),
+          summary: null,
+          importance: "normal",
+          consumed_event_ids: consumed
+        });
+        console.log(
+          chalk.dim(`[llm] ${moduleId}: promoted ${consumed.length} event(s)`)
+        );
       }
     }
   }
